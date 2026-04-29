@@ -16,16 +16,12 @@ pub enum HookEventType {
 
 impl fmt::Display for HookEventType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            HookEventType::PreToolUse => write!(f, "PreToolUse"),
-            HookEventType::PostToolUse => write!(f, "PostToolUse"),
-            HookEventType::SessionStart => write!(f, "SessionStart"),
-            HookEventType::UserPromptSubmit => write!(f, "UserPromptSubmit"),
-            HookEventType::Stop => write!(f, "Stop"),
-            HookEventType::SubagentStop => write!(f, "SubagentStop"),
-            HookEventType::Notification => write!(f, "Notification"),
-            HookEventType::PreCompact => write!(f, "PreCompact"),
-        }
+        let name = self
+            .to_possible_value()
+            .expect("all variants have a possible value")
+            .get_name()
+            .to_owned();
+        write!(f, "{}", name)
     }
 }
 
