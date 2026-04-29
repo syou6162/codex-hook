@@ -1,10 +1,39 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use std::fmt;
+
+#[derive(Clone, ValueEnum)]
+#[value(rename_all = "PascalCase")]
+pub enum HookEventType {
+    PreToolUse,
+    PostToolUse,
+    SessionStart,
+    UserPromptSubmit,
+    Stop,
+    SubagentStop,
+    Notification,
+    PreCompact,
+}
+
+impl fmt::Display for HookEventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HookEventType::PreToolUse => write!(f, "PreToolUse"),
+            HookEventType::PostToolUse => write!(f, "PostToolUse"),
+            HookEventType::SessionStart => write!(f, "SessionStart"),
+            HookEventType::UserPromptSubmit => write!(f, "UserPromptSubmit"),
+            HookEventType::Stop => write!(f, "Stop"),
+            HookEventType::SubagentStop => write!(f, "SubagentStop"),
+            HookEventType::Notification => write!(f, "Notification"),
+            HookEventType::PreCompact => write!(f, "PreCompact"),
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(about = "A hook tool for Codex CLI")]
 struct Cli {
     #[arg(long)]
-    event: String,
+    event: HookEventType,
 
     #[arg(long)]
     config: Option<String>,
@@ -25,7 +54,7 @@ mod tests {
     #[test]
     fn parse_event_flag() {
         let cli = Cli::parse_from(["codex-hook", "--event", "PreToolUse"]);
-        assert_eq!(cli.event, "PreToolUse");
+        assert!(matches!(cli.event, HookEventType::PreToolUse));
         assert!(cli.config.is_none());
     }
 
@@ -38,7 +67,37 @@ mod tests {
             "--config",
             "/path/to/config.yaml",
         ]);
-        assert_eq!(cli.event, "PostToolUse");
+        assert!(matches!(cli.event, HookEventType::PostToolUse));
         assert_eq!(cli.config.as_deref(), Some("/path/to/config.yaml"));
+    }
+
+    #[test]
+    fn reject_invalid_event() {
+        let result = Cli::try_parse_from(["codex-hook", "--event", "Invalid"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reject_lowercase_event() {
+        let result = Cli::try_parse_from(["codex-hook", "--event", "pretooluse"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_all_event_types() {
+        let events = [
+            "PreToolUse",
+            "PostToolUse",
+            "SessionStart",
+            "UserPromptSubmit",
+            "Stop",
+            "SubagentStop",
+            "Notification",
+            "PreCompact",
+        ];
+        for event in events {
+            let cli = Cli::parse_from(["codex-hook", "--event", event]);
+            assert_eq!(cli.event.to_string(), event);
+        }
     }
 }
