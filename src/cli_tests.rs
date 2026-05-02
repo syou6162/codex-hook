@@ -37,12 +37,15 @@ fn parse_all_event_types() {
     let events = [
         "PreToolUse",
         "PostToolUse",
-        "SessionStart",
-        "UserPromptSubmit",
+        "PermissionRequest",
+        "Notification",
         "Stop",
         "SubagentStop",
-        "Notification",
+        "SubagentStart",
         "PreCompact",
+        "SessionStart",
+        "SessionEnd",
+        "UserPromptSubmit",
     ];
     for event in events {
         let cli = Cli::parse_from(["codex-hook", "--event", event]);
