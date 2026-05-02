@@ -1,75 +1,50 @@
-//! cchook 互換の YAML 設定スキーマ。
+//! YAML config schema compatible with cchook (Go).
 //!
-//! このモジュールは cchook (Go 版) の YAML config 形式を Rust で再実装したものです。
-//! Codex (Claude Code) 本体の `settings.json` 形式とは異なるレイヤーです。
+//! This is a separate layer from Codex's own `settings.json` format.
+//! Codex invokes codex-hook as a shell hook; codex-hook reads this YAML config,
+//! evaluates conditions, executes actions, and returns JSON to stdout.
 //!
-//! Codex → (settings.json で shell hook として codex-hook を起動) → codex-hook が
-//! この YAML config を読み込み、条件評価・アクション実行を行い、Codex が理解する
-//! JSON を stdout に返します。
-//!
-//! 参照:
-//! - Codex hooks reference: https://docs.anthropic.com/en/docs/claude-code/hooks
-//! - cchook (Go 版): https://github.com/syou6162/cchook
+//! References:
+//! - Codex hooks: <https://docs.anthropic.com/en/docs/claude-code/hooks>
+//! - cchook (Go): <https://github.com/syou6162/cchook>
 
 use crate::error::ConfigError;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Codex が hook に渡す JSON input のフィールドに基づく条件型。
+/// Condition types that evaluate fields from the JSON input Codex passes to hooks.
 ///
-/// cchook と同じ 21 variant を定義。各 variant が対応する Codex input field を
-/// コメントで示す。
+/// 21 variants matching cchook. Each variant maps to a specific Codex input field.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ConditionType {
-    // ---- Common: 全イベント共通（BaseInput.cwd / 環境に基づく） ----
-    /// ファイル存在チェック（カレントディレクトリ直下）
+    // -- Common: based on BaseInput.cwd / filesystem --
     FileExists,
-    /// ファイル存在チェック（再帰的）
     FileExistsRecursive,
-    /// ファイル非存在チェック（カレントディレクトリ直下）
     FileNotExists,
-    /// ファイル非存在チェック（再帰的）
     FileNotExistsRecursive,
-    /// ディレクトリ存在チェック（カレントディレクトリ直下）
     DirExists,
-    /// ディレクトリ存在チェック（再帰的）
     DirExistsRecursive,
-    /// ディレクトリ非存在チェック（カレントディレクトリ直下）
     DirNotExists,
-    /// ディレクトリ非存在チェック（再帰的）
     DirNotExistsRecursive,
-    /// BaseInput.cwd が完全一致
     CwdIs,
-    /// BaseInput.cwd が完全不一致
     CwdIsNot,
-    /// BaseInput.cwd に部分文字列を含む
     CwdContains,
-    /// BaseInput.cwd に部分文字列を含まない
     CwdNotContains,
-    /// BaseInput.permission_mode が完全一致
     PermissionModeIs,
 
-    // ---- Tool-specific: PreToolUse/PostToolUse（tool_input フィールドに基づく） ----
-    /// tool_input.file_path の拡張子チェック
+    // -- Tool-specific: based on tool_input (PreToolUse/PostToolUse) --
     FileExtension,
-    /// tool_input.command に部分文字列を含む
     CommandContains,
-    /// tool_input.command が指定文字列で始まる
     CommandStartsWith,
-    /// tool_input.url が指定文字列で始まる
     UrlStartsWith,
-    /// tool_input.command で Git 管理ファイルへの操作をチェック
     GitTrackedFileOperation,
 
-    // ---- Prompt-specific: UserPromptSubmit（prompt フィールドに基づく） ----
-    /// UserPromptSubmitInput.prompt に対する正規表現マッチ
+    // -- Prompt-specific: based on UserPromptSubmitInput.prompt --
     PromptRegex,
-    /// transcript 内の user prompt カウントに基づく定期実行
     EveryNPrompts,
 
-    // ---- Session-specific: SessionEnd（reason フィールドに基づく） ----
-    /// SessionEndInput のセッション終了理由が完全一致
+    // -- Session-specific: based on SessionEndInput.reason --
     ReasonIs,
 }
 
@@ -103,12 +78,7 @@ pub(crate) struct Action {
     pub(crate) exit_status: Option<i32>,
 }
 
-// ---- matcher 必須のイベント型 ----
-// Codex の PreToolUse/PostToolUse は tool_name でマッチ
-// SessionStart は source ("startup", "resume", "clear", "compact") でマッチ
-// PreCompact は trigger ("manual", "auto") でマッチ
-// PermissionRequest は tool_name でマッチ
-// SubagentStart は agent_type でマッチ
+// -- Hooks with required matcher --
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct PreToolUseHook {
@@ -176,10 +146,7 @@ pub(crate) struct SubagentStartHook {
     pub(crate) actions: Vec<Action>,
 }
 
-// ---- matcher 任意のイベント型 ----
-// Codex の Notification は notification_type でマッチ（省略可）
-// SubagentStop は agent_type でマッチ（省略可）
-// SessionEnd は reason でマッチ（省略可）
+// -- Hooks with optional matcher --
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct NotificationHook {
@@ -217,8 +184,7 @@ pub(crate) struct SessionEndHook {
     pub(crate) actions: Vec<Action>,
 }
 
-// ---- matcher なしのイベント型 ----
-// Codex の Stop / UserPromptSubmit にはマッチ対象フィールドがない
+// -- Hooks without matcher --
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct StopHook {
@@ -238,11 +204,7 @@ pub(crate) struct UserPromptSubmitHook {
     pub(crate) actions: Vec<Action>,
 }
 
-/// cchook 互換の設定ファイル構造。
-///
-/// cchook (Go 版) が対応する 11 イベント型すべてを定義。
-/// Codex 本体は 27+ のイベント型を持つが、cchook が対応していないものは
-/// 今後必要に応じて追加する。
+/// Top-level config covering all 11 event types supported by cchook.
 #[derive(Debug, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct Config {
