@@ -37,9 +37,16 @@ pub enum ConfigError {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ActionType {
+    Command,
+    Output,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct Action {
     #[serde(rename = "type")]
-    pub action_type: String,
+    pub action_type: ActionType,
 
     #[serde(default)]
     pub command: Option<String>,
@@ -87,18 +94,14 @@ pub struct Config {
 pub fn default_config_path() -> PathBuf {
     let config_dir = std::env::var("XDG_CONFIG_HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| dirs_fallback_config_dir());
+        .unwrap_or_else(|_| home_dir().join(".config"));
     config_dir.join("codex-hook").join("config.yaml")
-}
-
-fn dirs_fallback_config_dir() -> PathBuf {
-    home_dir().join(".config")
 }
 
 fn home_dir() -> PathBuf {
     std::env::var("HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("~"))
+        .expect("HOME environment variable is not set")
 }
 
 pub fn load_config(path: &Path) -> Result<Config, ConfigError> {
@@ -200,7 +203,10 @@ PreToolUse:
         assert_eq!(config.pre_tool_use.len(), 1);
         assert_eq!(config.pre_tool_use[0].matcher, "Write");
         assert_eq!(config.pre_tool_use[0].actions.len(), 1);
-        assert_eq!(config.pre_tool_use[0].actions[0].action_type, "output");
+        assert_eq!(
+            config.pre_tool_use[0].actions[0].action_type,
+            ActionType::Output
+        );
         assert_eq!(
             config.pre_tool_use[0].actions[0].message.as_deref(),
             Some("Allowing write operation")
