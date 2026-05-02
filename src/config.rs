@@ -76,6 +76,14 @@ pub(crate) fn load_config(path: &Path) -> Result<Config, ConfigError> {
     Ok(config)
 }
 
+pub(crate) fn load_config_or_default(path: &Path) -> Result<Config, ConfigError> {
+    match std::fs::read_to_string(path) {
+        Ok(content) => Ok(serde_saphyr::from_str(&content)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Config::default()),
+        Err(e) => Err(ConfigError::Io(e)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +199,27 @@ Stop:
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, ConfigError::Yaml(_)));
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn load_config_or_default_file_not_found() {
+        let result = load_config_or_default(Path::new("/nonexistent/config.yaml"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Config::default());
+    }
+
+    #[test]
+    fn load_config_or_default_invalid_yaml() {
+        let dir = std::env::temp_dir().join("codex-hook-test-or-default-invalid");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("invalid.yaml");
+        std::fs::write(&path, "PreToolUse: [[[invalid").unwrap();
+
+        let result = load_config_or_default(&path);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ConfigError::Yaml(_)));
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
