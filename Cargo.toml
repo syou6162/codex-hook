@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.61", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-saphyr = { version = "0.0", features = ["deserialize"] }
+thiserror = "2"
