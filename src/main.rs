@@ -28,7 +28,10 @@ fn main() {
 
     match result {
         Ok(config) => println!("config: {:#?}", config),
-        Err(err) => eprintln!("error: {}", err),
+        Err(err) => {
+            eprintln!("error: {}", err);
+            std::process::exit(1);
+        }
     }
 }
 
