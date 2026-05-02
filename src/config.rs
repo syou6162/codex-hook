@@ -3,6 +3,44 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ConditionType {
+    // Common（全イベント共通）
+    FileExists,
+    FileExistsRecursive,
+    FileNotExists,
+    FileNotExistsRecursive,
+    DirExists,
+    DirExistsRecursive,
+    DirNotExists,
+    DirNotExistsRecursive,
+    CwdIs,
+    CwdIsNot,
+    CwdContains,
+    CwdNotContains,
+    PermissionModeIs,
+    // Tool-specific（PreToolUse/PostToolUse）
+    FileExtension,
+    CommandContains,
+    CommandStartsWith,
+    UrlStartsWith,
+    GitTrackedFileOperation,
+    // Prompt-specific（UserPromptSubmit）
+    PromptRegex,
+    EveryNPrompts,
+    // Session-specific（SessionEnd）
+    ReasonIs,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct Condition {
+    #[serde(rename = "type")]
+    pub(crate) condition_type: ConditionType,
+
+    pub(crate) value: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum ActionType {
     Command,
@@ -19,11 +57,17 @@ pub(crate) struct Action {
 
     #[serde(default)]
     pub(crate) message: Option<String>,
+
+    #[serde(default)]
+    pub(crate) exit_status: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct PreToolUseHook {
     pub(crate) matcher: String,
+
+    #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
 
     #[serde(default)]
     pub(crate) actions: Vec<Action>,
@@ -34,6 +78,9 @@ pub(crate) struct PostToolUseHook {
     pub(crate) matcher: String,
 
     #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
+    #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
 
@@ -42,12 +89,18 @@ pub(crate) struct SessionStartHook {
     pub(crate) matcher: String,
 
     #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
+    #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct PreCompactHook {
     pub(crate) matcher: String,
+
+    #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
 
     #[serde(default)]
     pub(crate) actions: Vec<Action>,
@@ -59,6 +112,9 @@ pub(crate) struct NotificationHook {
     pub(crate) matcher: Option<String>,
 
     #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
+    #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
 
@@ -68,17 +124,26 @@ pub(crate) struct SubagentStopHook {
     pub(crate) matcher: Option<String>,
 
     #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
+    #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct StopHook {
     #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
+    #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct UserPromptSubmitHook {
+    #[serde(default)]
+    pub(crate) conditions: Vec<Condition>,
+
     #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
