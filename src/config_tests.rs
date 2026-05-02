@@ -138,6 +138,224 @@ fn load_config_or_default_invalid_yaml() {
 }
 
 #[test]
+fn deserialize_pre_tool_use_with_conditions() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Write|Edit"
+    conditions:
+      - type: file_extension
+        value: ".rs"
+      - type: cwd_contains
+        value: "src"
+    actions:
+      - type: command
+        command: "echo 'hook fired'"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(config.pre_tool_use.len(), 1);
+
+    let hook = &config.pre_tool_use[0];
+    assert_eq!(hook.matcher, "Write|Edit");
+    assert_eq!(hook.conditions.len(), 2);
+    assert_eq!(
+        hook.conditions[0].condition_type,
+        ConditionType::FileExtension
+    );
+    assert_eq!(hook.conditions[0].value, ".rs");
+    assert_eq!(
+        hook.conditions[1].condition_type,
+        ConditionType::CwdContains
+    );
+    assert_eq!(hook.conditions[1].value, "src");
+    assert_eq!(hook.actions.len(), 1);
+}
+
+#[test]
+fn deserialize_action_with_exit_status() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Bash"
+    conditions:
+      - type: dir_exists
+        value: "build"
+    actions:
+      - type: output
+        message: "Build directory already exists."
+        exit_status: 1
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    let action = &config.pre_tool_use[0].actions[0];
+    assert_eq!(action.action_type, ActionType::Output);
+    assert_eq!(
+        action.message.as_deref(),
+        Some("Build directory already exists.")
+    );
+    assert_eq!(action.exit_status, Some(1));
+}
+
+#[test]
+fn deserialize_action_without_exit_status() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Write"
+    actions:
+      - type: command
+        command: "echo hello"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(config.pre_tool_use[0].actions[0].exit_status, None);
+}
+
+#[test]
+fn deserialize_stop_hook_without_matcher() {
+    let yaml = r#"
+Stop:
+  - actions:
+      - type: command
+        command: "ntfy publish 'session stopped'"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(config.stop.len(), 1);
+    assert_eq!(config.stop[0].actions.len(), 1);
+    assert_eq!(
+        config.stop[0].actions[0].command.as_deref(),
+        Some("ntfy publish 'session stopped'")
+    );
+}
+
+#[test]
+fn deserialize_user_prompt_submit_hook_without_matcher() {
+    let yaml = r#"
+UserPromptSubmit:
+  - conditions:
+      - type: prompt_regex
+        value: "delete|rm -rf"
+    actions:
+      - type: output
+        message: "Dangerous command detected"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(config.user_prompt_submit.len(), 1);
+
+    let hook = &config.user_prompt_submit[0];
+    assert_eq!(hook.conditions.len(), 1);
+    assert_eq!(
+        hook.conditions[0].condition_type,
+        ConditionType::PromptRegex
+    );
+    assert_eq!(hook.conditions[0].value, "delete|rm -rf");
+}
+
+#[test]
+fn deserialize_invalid_condition_type() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Write"
+    conditions:
+      - type: nonexistent_condition
+        value: "test"
+    actions:
+      - type: output
+        message: "test"
+"#;
+    let result: Result<Config, _> = serde_saphyr::from_str(yaml);
+    assert!(result.is_err());
+}
+
+#[test]
+fn deserialize_notification_hook_without_matcher() {
+    let yaml = r#"
+Notification:
+  - actions:
+      - type: command
+        command: "notify-send 'alert'"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(config.notification.len(), 1);
+    assert_eq!(config.notification[0].matcher, None);
+}
+
+#[test]
+fn deserialize_notification_hook_with_matcher() {
+    let yaml = r#"
+Notification:
+  - matcher: "permission_prompt"
+    actions:
+      - type: command
+        command: "notify-send 'permission needed'"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert_eq!(
+        config.notification[0].matcher.as_deref(),
+        Some("permission_prompt")
+    );
+}
+
+#[test]
+fn deserialize_cchook_readme_example() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Bash"
+    conditions:
+      - type: dir_exists
+        value: "build"
+      - type: command_starts_with
+        value: "make"
+    actions:
+      - type: output
+        message: "Build directory already exists. Run 'make clean' first."
+        exit_status: 1
+PostToolUse:
+  - matcher: "Write"
+    conditions:
+      - type: file_extension
+        value: ".go"
+      - type: file_not_exists_recursive
+        value: "main_test.go"
+    actions:
+      - type: output
+        message: "Consider adding tests"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+
+    assert_eq!(config.pre_tool_use.len(), 1);
+    assert_eq!(config.pre_tool_use[0].conditions.len(), 2);
+    assert_eq!(
+        config.pre_tool_use[0].conditions[0].condition_type,
+        ConditionType::DirExists
+    );
+    assert_eq!(
+        config.pre_tool_use[0].conditions[1].condition_type,
+        ConditionType::CommandStartsWith
+    );
+    assert_eq!(config.pre_tool_use[0].actions[0].exit_status, Some(1));
+
+    assert_eq!(config.post_tool_use.len(), 1);
+    assert_eq!(config.post_tool_use[0].conditions.len(), 2);
+    assert_eq!(
+        config.post_tool_use[0].conditions[0].condition_type,
+        ConditionType::FileExtension
+    );
+    assert_eq!(
+        config.post_tool_use[0].conditions[1].condition_type,
+        ConditionType::FileNotExistsRecursive
+    );
+}
+
+#[test]
+fn deserialize_hook_without_conditions() {
+    let yaml = r#"
+PreToolUse:
+  - matcher: "Write"
+    actions:
+      - type: output
+        message: "hello"
+"#;
+    let config: Config = serde_saphyr::from_str(yaml).unwrap();
+    assert!(config.pre_tool_use[0].conditions.is_empty());
+}
+
+#[test]
 fn default_config_path_resolution() {
     std::env::set_var("XDG_CONFIG_HOME", "/tmp/xdg-test");
     let path = default_config_path();
