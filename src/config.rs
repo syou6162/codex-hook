@@ -22,9 +22,63 @@ pub(crate) struct Action {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-pub(crate) struct HookRule {
+pub(crate) struct PreToolUseHook {
     pub(crate) matcher: String,
 
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct PostToolUseHook {
+    pub(crate) matcher: String,
+
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct SessionStartHook {
+    pub(crate) matcher: String,
+
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct PreCompactHook {
+    pub(crate) matcher: String,
+
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct NotificationHook {
+    #[serde(default)]
+    pub(crate) matcher: Option<String>,
+
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct SubagentStopHook {
+    #[serde(default)]
+    pub(crate) matcher: Option<String>,
+
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct StopHook {
+    #[serde(default)]
+    pub(crate) actions: Vec<Action>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct UserPromptSubmitHook {
     #[serde(default)]
     pub(crate) actions: Vec<Action>,
 }
@@ -33,28 +87,28 @@ pub(crate) struct HookRule {
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct Config {
     #[serde(default)]
-    pub(crate) pre_tool_use: Vec<HookRule>,
+    pub(crate) pre_tool_use: Vec<PreToolUseHook>,
 
     #[serde(default)]
-    pub(crate) post_tool_use: Vec<HookRule>,
+    pub(crate) post_tool_use: Vec<PostToolUseHook>,
 
     #[serde(default)]
-    pub(crate) session_start: Vec<HookRule>,
+    pub(crate) session_start: Vec<SessionStartHook>,
 
     #[serde(default)]
-    pub(crate) user_prompt_submit: Vec<HookRule>,
+    pub(crate) user_prompt_submit: Vec<UserPromptSubmitHook>,
 
     #[serde(default)]
-    pub(crate) stop: Vec<HookRule>,
+    pub(crate) stop: Vec<StopHook>,
 
     #[serde(default)]
-    pub(crate) subagent_stop: Vec<HookRule>,
+    pub(crate) subagent_stop: Vec<SubagentStopHook>,
 
     #[serde(default)]
-    pub(crate) notification: Vec<HookRule>,
+    pub(crate) notification: Vec<NotificationHook>,
 
     #[serde(default)]
-    pub(crate) pre_compact: Vec<HookRule>,
+    pub(crate) pre_compact: Vec<PreCompactHook>,
 }
 
 pub(crate) fn default_config_path() -> PathBuf {

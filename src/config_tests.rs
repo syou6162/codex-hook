@@ -61,8 +61,7 @@ fn deserialize_empty_yaml() {
 fn deserialize_partial_config() {
     let yaml = r#"
 Stop:
-  - matcher: ""
-    actions:
+  - actions:
       - type: command
         command: "ntfy publish 'done'"
 "#;
