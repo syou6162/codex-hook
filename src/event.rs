@@ -6,12 +6,15 @@ use std::fmt;
 pub(crate) enum HookEventType {
     PreToolUse,
     PostToolUse,
-    SessionStart,
-    UserPromptSubmit,
+    PermissionRequest,
+    Notification,
     Stop,
     SubagentStop,
-    Notification,
+    SubagentStart,
     PreCompact,
+    SessionStart,
+    SessionEnd,
+    UserPromptSubmit,
 }
 
 impl fmt::Display for HookEventType {
