@@ -21,8 +21,8 @@ fn no_match() {
 }
 
 #[test]
-fn partial_match() {
-    assert!(check_matcher("Write", "WriteFile").unwrap());
+fn no_partial_match() {
+    assert!(!check_matcher("Write", "WriteFile").unwrap());
 }
 
 #[test]
@@ -46,8 +46,13 @@ fn case_sensitive() {
 }
 
 #[test]
-fn complex_tool_name_partial() {
-    assert!(check_matcher("Multi", "MultiEdit").unwrap());
+fn no_partial_match_prefix() {
+    assert!(!check_matcher("Multi", "MultiEdit").unwrap());
+}
+
+#[test]
+fn regex_dot_star_for_partial() {
+    assert!(check_matcher("Write.*", "WriteFile").unwrap());
 }
 
 #[test]

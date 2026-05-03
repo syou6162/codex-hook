@@ -1,7 +1,8 @@
 //! Matcher logic for filtering hooks by tool name.
 //!
-//! A matcher is a regular expression pattern (compatible with cchook's
-//! pipe-separated syntax, since `|` is regex alternation).
+//! A matcher is a regular expression pattern. The pattern is automatically
+//! anchored with `^(?:...)$` so that it must match the full tool name.
+//! Use `|` for alternation (e.g. `"Write|Edit"`).
 //! An empty matcher matches every tool name.
 
 use crate::config::PreToolUseHook;
@@ -10,12 +11,13 @@ use regex::Regex;
 /// Check whether `tool_name` matches the given matcher pattern.
 ///
 /// Returns `true` when the matcher is empty (matches everything) or when
-/// the compiled regex finds a match in `tool_name`.
+/// the anchored regex matches the full `tool_name`.
 pub(crate) fn check_matcher(matcher: &str, tool_name: &str) -> Result<bool, regex::Error> {
     if matcher.is_empty() {
         return Ok(true);
     }
-    let re = Regex::new(matcher)?;
+    let anchored = format!("^(?:{})$", matcher);
+    let re = Regex::new(&anchored)?;
     Ok(re.is_match(tool_name))
 }
 
