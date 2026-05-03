@@ -1,10 +1,24 @@
 //! Action execution for codex-hook.
 //!
-//! Currently supports `ActionType::Command`, which runs a shell command
-//! via `sh -c`. This mirrors cchook (Go)'s `runCommand` function.
-//! `ActionType::Output` will be implemented in YAS-422.
+//! Supports two action types:
+//! - `ActionType::Command`: runs a shell command via `sh -c` (cchook `runCommand`).
+//! - `ActionType::Output`: serializes a message as JSON to stdout.
 
+use serde::Serialize;
 use std::process::{Command, ExitStatus, Stdio};
+
+/// JSON output structure for the `output` action type.
+///
+/// Codex reads `{"message": "..."}` from the hook's stdout.
+#[derive(Serialize)]
+pub(crate) struct OutputMessage<'a> {
+    pub(crate) message: &'a str,
+}
+
+/// Build a JSON string `{"message":"..."}` for the given message.
+pub(crate) fn build_output_json(message: &str) -> String {
+    serde_json::to_string(&OutputMessage { message }).expect("JSON serialization should not fail")
+}
 
 /// Execute a shell command via `sh -c` and return its exit status.
 ///
