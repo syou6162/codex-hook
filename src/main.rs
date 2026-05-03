@@ -82,11 +82,11 @@ fn main() {
                                     if let Some(msg) = &action.message {
                                         println!("{}", build_output_json(msg));
                                         output_emitted = true;
+                                        if let Some(code) = action.exit_status {
+                                            std::process::exit(code);
+                                        }
                                     } else {
                                         eprintln!("error: output action has no message");
-                                    }
-                                    if let Some(code) = action.exit_status {
-                                        std::process::exit(code);
                                     }
                                 }
                             }
