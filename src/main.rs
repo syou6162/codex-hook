@@ -2,11 +2,13 @@ mod config;
 mod error;
 mod event;
 mod input;
+mod matcher;
 
 use clap::Parser;
 use config::{default_config_path, load_config, load_config_or_default};
 use event::HookEventType;
 use input::read_pre_tool_use_input;
+use matcher::filter_pre_tool_use_hooks;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -34,15 +36,17 @@ fn main() {
     };
 
     // TODO(YAS-422): config の debug print も同様に後続チケットで削除する。
-    match result {
-        Ok(config) => println!("config: {:#?}", config),
+    let config = match result {
+        Ok(config) => {
+            println!("config: {:#?}", config);
+            config
+        }
         Err(err) => {
             eprintln!("error: {}", err);
             std::process::exit(1);
         }
-    }
+    };
 
-    // TODO(YAS-418): Matcher 実装後、config の PreToolUse hooks とマッチングを行う。
     // TODO(YAS-419/YAS-422): Action 実装後、マッチ結果に基づいて
     // Codex 互換の JSON（PreToolUseOutput）を stdout に出力する。
     // 出力形式: {"continue":true,"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow",...}}
@@ -50,9 +54,20 @@ fn main() {
     match cli.event {
         HookEventType::PreToolUse => match read_pre_tool_use_input(std::io::stdin()) {
             Ok(input) => {
-                // TODO(YAS-422): この debug print を Codex 互換 JSON 出力に差し替える。
-                println!("tool_name: {}", input.tool_name);
-                println!("tool_input: {:?}", input.tool_input);
+                match filter_pre_tool_use_hooks(&config.pre_tool_use, &input.tool_name) {
+                    Ok(matched) => {
+                        // TODO(YAS-422): この debug print を Codex 互換 JSON 出力に差し替える。
+                        println!("tool_name: {}", input.tool_name);
+                        println!("matched_hooks: {}", matched.len());
+                        for hook in &matched {
+                            println!("  matcher: {:?}, actions: {:?}", hook.matcher, hook.actions);
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("error: invalid matcher regex: {}", err);
+                        std::process::exit(1);
+                    }
+                }
             }
             Err(err) => {
                 eprintln!("error: {}", err);
