@@ -1,10 +1,12 @@
 mod config;
 mod error;
 mod event;
+mod input;
 
 use clap::Parser;
 use config::{default_config_path, load_config, load_config_or_default};
 use event::HookEventType;
+use input::read_pre_tool_use_input;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -19,6 +21,11 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
+
+    // TODO(YAS-422): この println! は debug 用。後続チケットで削除し、
+    // Codex が期待する JSON を stdout に出力するように差し替える。
+    // stdout に非 JSON テキストがあると Codex がパースに失敗するため、
+    // 最終的には全ての stdout 出力を Codex 互換 JSON に統一する必要がある。
     println!("event: {}", cli.event);
 
     let result = match cli.config {
@@ -26,11 +33,34 @@ fn main() {
         None => load_config_or_default(&default_config_path()),
     };
 
+    // TODO(YAS-422): config の debug print も同様に後続チケットで削除する。
     match result {
         Ok(config) => println!("config: {:#?}", config),
         Err(err) => {
             eprintln!("error: {}", err);
             std::process::exit(1);
+        }
+    }
+
+    // TODO(YAS-418): Matcher 実装後、config の PreToolUse hooks とマッチングを行う。
+    // TODO(YAS-419/YAS-422): Action 実装後、マッチ結果に基づいて
+    // Codex 互換の JSON（PreToolUseOutput）を stdout に出力する。
+    // 出力形式: {"continue":true,"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow",...}}
+    // exit 0 + 空 stdout は「許可」として扱われる。
+    match cli.event {
+        HookEventType::PreToolUse => match read_pre_tool_use_input(std::io::stdin()) {
+            Ok(input) => {
+                // TODO(YAS-422): この debug print を Codex 互換 JSON 出力に差し替える。
+                println!("tool_name: {}", input.tool_name);
+                println!("tool_input: {:?}", input.tool_input);
+            }
+            Err(err) => {
+                eprintln!("error: {}", err);
+                std::process::exit(1);
+            }
+        },
+        _ => {
+            // TODO: 他のイベントタイプの入力パース・処理は後続チケットで実装する。
         }
     }
 }
