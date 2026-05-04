@@ -61,3 +61,34 @@ fn output_message_has_only_message_field() {
     assert_eq!(obj.len(), 1);
     assert!(obj.contains_key("message"));
 }
+
+#[test]
+fn output_message_merged_multiple_messages() {
+    let messages = vec!["msg1".to_string(), "msg2".to_string(), "msg3".to_string()];
+    let merged = messages.join("\n");
+    let json = build_output_json(&merged);
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["message"], "msg1\nmsg2\nmsg3");
+}
+
+#[test]
+fn output_message_merged_single_message() {
+    let messages = vec!["only one".to_string()];
+    let merged = messages.join("\n");
+    let json = build_output_json(&merged);
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["message"], "only one");
+}
+
+#[test]
+fn output_message_merged_produces_single_json_object() {
+    let messages = vec!["first".to_string(), "second".to_string()];
+    let merged = messages.join("\n");
+    let json = build_output_json(&merged);
+    // Must be parseable as a single JSON object (Codex requirement)
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert!(parsed.is_object());
+    let obj = parsed.as_object().unwrap();
+    assert_eq!(obj.len(), 1);
+    assert!(obj.contains_key("message"));
+}

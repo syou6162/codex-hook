@@ -43,7 +43,8 @@ fn main() {
         HookEventType::PreToolUse => match read_pre_tool_use_input(std::io::stdin()) {
             Ok(input) => match filter_pre_tool_use_hooks(&config.pre_tool_use, &input.tool_name) {
                 Ok(matched) => {
-                    let mut output_emitted = false;
+                    let mut output_messages: Vec<String> = Vec::new();
+                    let mut last_exit_status: Option<i32> = None;
                     for hook in &matched {
                         for action in &hook.actions {
                             match action.action_type {
@@ -71,26 +72,24 @@ fn main() {
                                     }
                                 }
                                 ActionType::Output => {
-                                    if output_emitted {
-                                        eprintln!(
-                                            "warning: multiple output actions matched; \
-                                             only the first output is sent to stdout \
-                                             (Codex expects a single JSON object)"
-                                        );
-                                        continue;
-                                    }
                                     if let Some(msg) = &action.message {
-                                        println!("{}", build_output_json(msg));
-                                        output_emitted = true;
-                                        if let Some(code) = action.exit_status {
-                                            std::process::exit(code);
-                                        }
+                                        output_messages.push(msg.clone());
                                     } else {
                                         eprintln!("error: output action has no message");
+                                    }
+                                    if action.exit_status.is_some() {
+                                        last_exit_status = action.exit_status;
                                     }
                                 }
                             }
                         }
+                    }
+                    if !output_messages.is_empty() {
+                        let merged = output_messages.join("\n");
+                        println!("{}", build_output_json(&merged));
+                    }
+                    if let Some(code) = last_exit_status {
+                        std::process::exit(code);
                     }
                 }
                 Err(err) => {
