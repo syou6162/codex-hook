@@ -28,6 +28,9 @@ pub(crate) struct PreToolUseInput {
 
     pub(crate) tool_name: String,
     pub(crate) tool_input: HashMap<String, serde_json::Value>,
+
+    #[serde(default)]
+    pub(crate) permission_mode: Option<String>,
 }
 
 /// Read JSON from stdin and deserialize into `PreToolUseInput`.
