@@ -92,3 +92,36 @@ fn output_message_merged_produces_single_json_object() {
     assert_eq!(obj.len(), 1);
     assert!(obj.contains_key("message"));
 }
+
+#[test]
+fn merge_exit_status_none_then_zero() {
+    assert_eq!(merge_exit_status(None, 0), Some(0));
+}
+
+#[test]
+fn merge_exit_status_none_then_nonzero() {
+    assert_eq!(merge_exit_status(None, 1), Some(1));
+}
+
+#[test]
+fn merge_exit_status_nonzero_preserved_over_zero() {
+    // failure (1) followed by success (0) → failure preserved
+    assert_eq!(merge_exit_status(Some(1), 0), Some(1));
+}
+
+#[test]
+fn merge_exit_status_zero_overwritten_by_nonzero() {
+    // success (0) followed by failure (1) → failure wins
+    assert_eq!(merge_exit_status(Some(0), 1), Some(1));
+}
+
+#[test]
+fn merge_exit_status_nonzero_preserved_over_nonzero() {
+    // first failure preserved
+    assert_eq!(merge_exit_status(Some(1), 2), Some(1));
+}
+
+#[test]
+fn merge_exit_status_zero_then_zero() {
+    assert_eq!(merge_exit_status(Some(0), 0), Some(0));
+}

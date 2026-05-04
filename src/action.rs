@@ -20,6 +20,18 @@ pub(crate) fn build_output_json(message: &str) -> String {
     serde_json::to_string(&OutputMessage { message }).expect("JSON serialization should not fail")
 }
 
+/// Merge a new exit_status into the accumulated result.
+///
+/// Non-zero (failure) takes precedence: once a non-zero code is seen,
+/// subsequent zero codes cannot overwrite it.  This ensures that if any
+/// output action signals a failure, the overall result is a failure.
+pub(crate) fn merge_exit_status(current: Option<i32>, new_code: i32) -> Option<i32> {
+    Some(match current {
+        Some(prev) if prev != 0 => prev,
+        _ => new_code,
+    })
+}
+
 /// Execute a shell command via `sh -c` and return its exit status.
 ///
 /// The child's stdout is suppressed (redirected to null) so that command

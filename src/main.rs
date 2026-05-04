@@ -5,7 +5,7 @@ mod event;
 mod input;
 mod matcher;
 
-use action::{build_output_json, execute_command};
+use action::{build_output_json, execute_command, merge_exit_status};
 use clap::Parser;
 use config::{default_config_path, load_config, load_config_or_default, ActionType};
 use event::HookEventType;
@@ -44,7 +44,7 @@ fn main() {
             Ok(input) => match filter_pre_tool_use_hooks(&config.pre_tool_use, &input.tool_name) {
                 Ok(matched) => {
                     let mut output_messages: Vec<String> = Vec::new();
-                    let mut last_exit_status: Option<i32> = None;
+                    let mut merged_exit_status: Option<i32> = None;
                     for hook in &matched {
                         for action in &hook.actions {
                             match action.action_type {
@@ -77,8 +77,9 @@ fn main() {
                                     } else {
                                         eprintln!("error: output action has no message");
                                     }
-                                    if action.exit_status.is_some() {
-                                        last_exit_status = action.exit_status;
+                                    if let Some(code) = action.exit_status {
+                                        merged_exit_status =
+                                            merge_exit_status(merged_exit_status, code);
                                     }
                                 }
                             }
@@ -88,7 +89,7 @@ fn main() {
                         let merged = output_messages.join("\n");
                         println!("{}", build_output_json(&merged));
                     }
-                    if let Some(code) = last_exit_status {
+                    if let Some(code) = merged_exit_status {
                         std::process::exit(code);
                     }
                 }
