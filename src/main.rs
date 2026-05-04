@@ -1,4 +1,5 @@
 mod action;
+mod condition;
 mod config;
 mod error;
 mod event;
@@ -8,6 +9,7 @@ mod template;
 
 use action::{build_output_json, execute_command, merge_exit_status};
 use clap::Parser;
+use condition::{evaluate_conditions, ConditionContext};
 use config::{default_config_path, load_config, load_config_or_default, ActionType};
 use event::HookEventType;
 use input::read_pre_tool_use_input_with_raw;
@@ -55,7 +57,15 @@ fn main() {
                     Ok(matched) => {
                         let mut output_messages: Vec<String> = Vec::new();
                         let mut merged_exit_status: Option<i32> = None;
+                        let cond_ctx = ConditionContext {
+                            cwd: &input.base.cwd,
+                            tool_input: &input.tool_input,
+                            permission_mode: input.permission_mode.as_deref(),
+                        };
                         for hook in &matched {
+                            if !evaluate_conditions(&hook.conditions, &cond_ctx) {
+                                continue;
+                            }
                             for action in &hook.actions {
                                 match action.action_type {
                                     ActionType::Command => {
