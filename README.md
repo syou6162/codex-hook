@@ -12,9 +12,41 @@ cargo install --git https://github.com/syou6162/codex-hook
 
 ## Quick Start
 
-### 1. Configure Codex CLI Hooks
+### 1. Enable Hooks and Configure Codex CLI
 
-Add codex-hook to your Codex hook configuration in `~/.codex/hooks.json`:
+Codex CLI hooks require a feature flag. Add the following to `~/.codex/config.toml`:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+Then register codex-hook as a command hook. You can use either **inline TOML** or a separate **hooks.json** file.
+
+#### Option A: Inline in `config.toml`
+
+```toml
+[features]
+codex_hooks = true
+
+[[hooks.PreToolUse]]
+matcher = ""
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "codex-hook --event PreToolUse"
+
+[[hooks.PostToolUse]]
+matcher = ""
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "codex-hook --event PostToolUse"
+```
+
+#### Option B: Separate `hooks.json`
+
+Create `~/.codex/hooks.json` (keep the feature flag in `config.toml`):
 
 ```json
 {
@@ -45,7 +77,9 @@ Add codex-hook to your Codex hook configuration in `~/.codex/hooks.json`:
 }
 ```
 
-You can also place this in `.codex/hooks.json` at the project root for project-scoped hooks.
+> **Note**: Do not use both `hooks.json` and inline `[hooks]` in the same config layer — Codex will merge them but emit a warning.
+
+You can also place project-scoped hooks in `.codex/config.toml` or `.codex/hooks.json` at the project root.
 
 ### 2. Create Configuration File
 
