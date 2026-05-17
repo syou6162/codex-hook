@@ -72,6 +72,8 @@ impl std::fmt::Display for InputError {
     }
 }
 
+impl std::error::Error for InputError {}
+
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod input_tests;
