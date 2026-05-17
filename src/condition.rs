@@ -7,7 +7,9 @@
 //! Reference: cchook `checkCommonCondition` / `checkToolCondition` in utils.go.
 
 use crate::config::{Condition, ConditionType};
+use regex::Regex;
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::Command;
 use walkdir::WalkDir;
@@ -17,6 +19,14 @@ pub(crate) struct ConditionContext<'a> {
     pub cwd: &'a str,
     pub tool_input: &'a HashMap<String, serde_json::Value>,
     pub permission_mode: Option<&'a str>,
+}
+
+/// Context needed for condition evaluation in UserPromptSubmit events.
+pub(crate) struct UserPromptSubmitConditionContext<'a> {
+    pub cwd: &'a str,
+    pub prompt: &'a str,
+    pub transcript_path: &'a str,
+    pub session_id: &'a str,
 }
 
 /// Evaluate all conditions for a hook. Returns `true` if all conditions pass
@@ -69,6 +79,127 @@ fn evaluate_condition(condition: &Condition, ctx: &ConditionContext) -> bool {
             false
         }
     }
+}
+
+/// Evaluate all conditions for a UserPromptSubmit hook.
+pub(crate) fn evaluate_user_prompt_submit_conditions(
+    conditions: &[Condition],
+    ctx: &UserPromptSubmitConditionContext,
+) -> bool {
+    conditions
+        .iter()
+        .all(|c| evaluate_user_prompt_submit_condition(c, ctx))
+}
+
+/// Evaluate a single condition against the UserPromptSubmit context.
+fn evaluate_user_prompt_submit_condition(
+    condition: &Condition,
+    ctx: &UserPromptSubmitConditionContext,
+) -> bool {
+    match condition.condition_type {
+        // -- Common: filesystem --
+        ConditionType::FileExists => check_file_exists(ctx.cwd, &condition.value),
+        ConditionType::FileNotExists => !check_file_exists(ctx.cwd, &condition.value),
+        ConditionType::FileExistsRecursive => {
+            check_file_exists_recursive(ctx.cwd, &condition.value)
+        }
+        ConditionType::FileNotExistsRecursive => {
+            !check_file_exists_recursive(ctx.cwd, &condition.value)
+        }
+        ConditionType::DirExists => check_dir_exists(ctx.cwd, &condition.value),
+        ConditionType::DirNotExists => !check_dir_exists(ctx.cwd, &condition.value),
+        ConditionType::DirExistsRecursive => check_dir_exists_recursive(ctx.cwd, &condition.value),
+        ConditionType::DirNotExistsRecursive => {
+            !check_dir_exists_recursive(ctx.cwd, &condition.value)
+        }
+
+        // -- Common: cwd --
+        ConditionType::CwdIs => ctx.cwd == condition.value,
+        ConditionType::CwdIsNot => ctx.cwd != condition.value,
+        ConditionType::CwdContains => ctx.cwd.contains(&condition.value),
+        ConditionType::CwdNotContains => !ctx.cwd.contains(&condition.value),
+
+        // -- Common: permission (not available in UserPromptSubmit) --
+        ConditionType::PermissionModeIs => false,
+
+        // -- Tool-specific (not applicable to UserPromptSubmit) --
+        ConditionType::FileExtension
+        | ConditionType::CommandContains
+        | ConditionType::CommandStartsWith
+        | ConditionType::UrlStartsWith
+        | ConditionType::GitTrackedFileOperation => false,
+
+        // -- Prompt-specific --
+        ConditionType::PromptRegex => check_prompt_regex(ctx.prompt, &condition.value),
+        ConditionType::EveryNPrompts => {
+            check_every_n_prompts(ctx.transcript_path, ctx.session_id, &condition.value)
+        }
+
+        // -- Not applicable to UserPromptSubmit --
+        ConditionType::ReasonIs => false,
+    }
+}
+
+// -- Prompt-specific helpers --
+
+fn check_prompt_regex(prompt: &str, pattern: &str) -> bool {
+    match Regex::new(pattern) {
+        Ok(re) => re.is_match(prompt),
+        Err(e) => {
+            eprintln!("warning: invalid prompt_regex pattern '{}': {}", pattern, e);
+            false
+        }
+    }
+}
+
+fn check_every_n_prompts(transcript_path: &str, session_id: &str, value: &str) -> bool {
+    let n: usize = match value.parse() {
+        Ok(v) if v > 0 => v,
+        _ => {
+            eprintln!("warning: invalid every_n_prompts value '{}'", value);
+            return false;
+        }
+    };
+
+    let count = match count_user_prompts_from_transcript(transcript_path, session_id) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("warning: failed to count prompts: {}", e);
+            return false;
+        }
+    };
+
+    count % n == 0
+}
+
+/// Count user prompts in the transcript file for the specified session.
+/// Returns the count including the current prompt (count + 1).
+fn count_user_prompts_from_transcript(
+    transcript_path: &str,
+    session_id: &str,
+) -> Result<usize, std::io::Error> {
+    let file = std::fs::File::open(transcript_path)?;
+    let reader = BufReader::new(file);
+    let mut count: usize = 0;
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        let entry: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if entry.get("type").and_then(|v| v.as_str()) == Some("user")
+            && entry.get("sessionId").and_then(|v| v.as_str()) == Some(session_id)
+        {
+            count += 1;
+        }
+    }
+
+    // Include the current prompt
+    Ok(count + 1)
 }
 
 // -- Filesystem helpers --
