@@ -122,3 +122,69 @@ fn ignore_extra_top_level_fields() {
     let input: PreToolUseInput = serde_json::from_str(json).unwrap();
     assert_eq!(input.tool_name, "Bash");
 }
+
+// -- UserPromptSubmitInput tests --
+
+#[test]
+fn deserialize_user_prompt_submit_input() {
+    let json = r#"{
+        "session_id": "test-session",
+        "transcript_path": "/tmp/transcript.log",
+        "cwd": "/home/user/project",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "fix the bug in main.rs"
+    }"#;
+    let input: UserPromptSubmitInput = serde_json::from_str(json).unwrap();
+    assert_eq!(input.base.session_id, "test-session");
+    assert_eq!(input.base.transcript_path, "/tmp/transcript.log");
+    assert_eq!(input.base.cwd, "/home/user/project");
+    assert_eq!(input.base.hook_event_name, "UserPromptSubmit");
+    assert_eq!(input.prompt, "fix the bug in main.rs");
+}
+
+#[test]
+fn deserialize_user_prompt_submit_empty_prompt() {
+    let json = r#"{
+        "session_id": "s1",
+        "transcript_path": "/tmp/t.log",
+        "cwd": "/home/user",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": ""
+    }"#;
+    let input: UserPromptSubmitInput = serde_json::from_str(json).unwrap();
+    assert_eq!(input.prompt, "");
+}
+
+#[test]
+fn reject_user_prompt_submit_missing_prompt() {
+    let json = r#"{
+        "session_id": "s1",
+        "transcript_path": "/tmp/t.log",
+        "cwd": "/home/user",
+        "hook_event_name": "UserPromptSubmit"
+    }"#;
+    let result: Result<UserPromptSubmitInput, _> = serde_json::from_str(json);
+    assert!(result.is_err());
+}
+
+#[test]
+fn user_prompt_submit_ignores_extra_fields() {
+    let json = r#"{
+        "session_id": "s1",
+        "transcript_path": "/tmp/t.log",
+        "cwd": "/home/user",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "hello",
+        "extra_field": 42
+    }"#;
+    let input: UserPromptSubmitInput = serde_json::from_str(json).unwrap();
+    assert_eq!(input.prompt, "hello");
+}
+
+#[test]
+fn read_user_prompt_submit_input_with_raw_roundtrip() {
+    let json = r#"{"session_id":"test","transcript_path":"/tmp/t.log","cwd":"/home","hook_event_name":"UserPromptSubmit","prompt":"do something"}"#;
+    let (input, raw) = read_user_prompt_submit_input_with_raw(json.as_bytes()).unwrap();
+    assert_eq!(input.prompt, "do something");
+    assert_eq!(raw, json.as_bytes());
+}

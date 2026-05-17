@@ -540,10 +540,10 @@ fn git_tracked_file_operation_on_untracked_file() {
     assert!(!evaluate_condition(&cond, &ctx));
 }
 
-// -- PromptRegex / EveryNPrompts / ReasonIs (not applicable) --
+// -- PromptRegex / EveryNPrompts / ReasonIs (not applicable to PreToolUse) --
 
 #[test]
-fn prompt_regex_always_false() {
+fn prompt_regex_false_for_pre_tool_use() {
     let tool_input = HashMap::new();
     let ctx = make_ctx("/tmp", &tool_input, None);
     let cond = make_condition(ConditionType::PromptRegex, ".*");
@@ -551,7 +551,7 @@ fn prompt_regex_always_false() {
 }
 
 #[test]
-fn every_n_prompts_always_false() {
+fn every_n_prompts_false_for_pre_tool_use() {
     let tool_input = HashMap::new();
     let ctx = make_ctx("/tmp", &tool_input, None);
     let cond = make_condition(ConditionType::EveryNPrompts, "5");
@@ -559,11 +559,177 @@ fn every_n_prompts_always_false() {
 }
 
 #[test]
-fn reason_is_always_false() {
+fn reason_is_false_for_pre_tool_use() {
     let tool_input = HashMap::new();
     let ctx = make_ctx("/tmp", &tool_input, None);
     let cond = make_condition(ConditionType::ReasonIs, "clear");
     assert!(!evaluate_condition(&cond, &ctx));
+}
+
+// -- UserPromptSubmit condition tests --
+
+fn make_ups_ctx<'a>(
+    cwd: &'a str,
+    prompt: &'a str,
+    transcript_path: &'a str,
+    session_id: &'a str,
+) -> UserPromptSubmitConditionContext<'a> {
+    UserPromptSubmitConditionContext {
+        cwd,
+        prompt,
+        transcript_path,
+        session_id,
+    }
+}
+
+#[test]
+fn ups_prompt_regex_match() {
+    let ctx = make_ups_ctx("/tmp", "please delete all files", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::PromptRegex, "delete|rm -rf");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_prompt_regex_no_match() {
+    let ctx = make_ups_ctx("/tmp", "add a new feature", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::PromptRegex, "delete|rm -rf");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_prompt_regex_invalid_pattern() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::PromptRegex, "[invalid");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_prompt_regex_empty_prompt() {
+    let ctx = make_ups_ctx("/tmp", "", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::PromptRegex, ".*");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_every_n_prompts_fires_on_first() {
+    let dir = tempdir("ups-every-n-first");
+    let transcript = dir.join("transcript.jsonl");
+    // Empty transcript → count=0+1=1, 1%1==0 → true
+    fs::write(&transcript, "").unwrap();
+    let tp = transcript.to_str().unwrap();
+    let ctx = make_ups_ctx("/tmp", "hello", tp, "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "1");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+    cleanup(&dir);
+}
+
+#[test]
+fn ups_every_n_prompts_with_transcript() {
+    let dir = tempdir("ups-every-n-transcript");
+    let transcript = dir.join("transcript.jsonl");
+    // 2 user prompts in transcript for session s1 → count=2+1=3, 3%3==0 → true
+    let content = r#"{"type":"user","sessionId":"s1","content":"first"}
+{"type":"assistant","sessionId":"s1","content":"reply"}
+{"type":"user","sessionId":"s1","content":"second"}
+"#;
+    fs::write(&transcript, content).unwrap();
+    let tp = transcript.to_str().unwrap();
+    let ctx = make_ups_ctx("/tmp", "third", tp, "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "3");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+    cleanup(&dir);
+}
+
+#[test]
+fn ups_every_n_prompts_not_multiple() {
+    let dir = tempdir("ups-every-n-not-mult");
+    let transcript = dir.join("transcript.jsonl");
+    // 1 user prompt → count=1+1=2, 2%3!=0 → false
+    let content = r#"{"type":"user","sessionId":"s1","content":"first"}
+"#;
+    fs::write(&transcript, content).unwrap();
+    let tp = transcript.to_str().unwrap();
+    let ctx = make_ups_ctx("/tmp", "second", tp, "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "3");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+    cleanup(&dir);
+}
+
+#[test]
+fn ups_every_n_prompts_filters_by_session_id() {
+    let dir = tempdir("ups-every-n-session");
+    let transcript = dir.join("transcript.jsonl");
+    // 1 prompt for s1, 1 for s2 → count for s1 = 1+1=2, 2%2==0 → true
+    let content = r#"{"type":"user","sessionId":"s1","content":"first"}
+{"type":"user","sessionId":"s2","content":"other"}
+"#;
+    fs::write(&transcript, content).unwrap();
+    let tp = transcript.to_str().unwrap();
+    let ctx = make_ups_ctx("/tmp", "second", tp, "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "2");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+    cleanup(&dir);
+}
+
+#[test]
+fn ups_every_n_prompts_invalid_value() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "abc");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_every_n_prompts_zero_value() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "0");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_every_n_prompts_missing_transcript() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/nonexistent/transcript.jsonl", "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "3");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_cwd_conditions_work() {
+    let ctx = make_ups_ctx("/home/user/project", "hello", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::CwdContains, "user/project");
+    assert!(evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_tool_specific_conditions_return_false() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/dev/null", "s1");
+    let cond = make_condition(ConditionType::FileExtension, ".rs");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_evaluate_all_conditions_and_logic() {
+    let ctx = make_ups_ctx("/home/user", "delete everything", "/dev/null", "s1");
+    let conditions = vec![
+        make_condition(ConditionType::PromptRegex, "delete"),
+        make_condition(ConditionType::CwdContains, "user"),
+    ];
+    assert!(evaluate_user_prompt_submit_conditions(&conditions, &ctx));
+}
+
+#[test]
+fn ups_evaluate_conditions_one_false_fails() {
+    let ctx = make_ups_ctx("/home/user", "add feature", "/dev/null", "s1");
+    let conditions = vec![
+        make_condition(ConditionType::PromptRegex, "delete"),
+        make_condition(ConditionType::CwdContains, "user"),
+    ];
+    assert!(!evaluate_user_prompt_submit_conditions(&conditions, &ctx));
+}
+
+#[test]
+fn ups_empty_conditions_returns_true() {
+    let ctx = make_ups_ctx("/tmp", "hello", "/dev/null", "s1");
+    assert!(evaluate_user_prompt_submit_conditions(&[], &ctx));
 }
 
 // -- Helpers --

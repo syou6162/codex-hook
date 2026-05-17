@@ -251,7 +251,7 @@ Empty braces `{}` are not treated as templates.
 | `PreCompact` | `tool_name` | Config parsing only |
 | `SessionStart` | `tool_name` | Config parsing only |
 | `SessionEnd` | optional matcher | Config parsing only |
-| `UserPromptSubmit` | — | Config parsing only |
+| `UserPromptSubmit` | — | Implemented |
 
 ## Configuration Examples
 
