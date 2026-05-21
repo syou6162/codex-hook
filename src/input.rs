@@ -1,11 +1,13 @@
 //! JSON input types for Codex CLI hook events.
 //!
 //! Codex passes JSON on stdin when invoking a hook. The schema is defined by
-//! `BaseHookInput` and per-event extensions in the Codex hooks reference:
-//! <https://docs.anthropic.com/en/docs/claude-code/hooks>
+//! `BaseHookInput`-style fields and per-event extensions in the official
+//! OpenAI Codex hook schemas:
+//! <https://github.com/openai/codex/tree/main/codex-rs/hooks/schema/generated>
 //!
 //! `BaseInput` holds the fields common to every event type.
 //! `PreToolUseInput` adds `tool_name` and `tool_input` for the PreToolUse event.
+//! `PostToolUseInput` adds the same tool fields plus `tool_response`.
 //! `UserPromptSubmitInput` adds `prompt` for the UserPromptSubmit event.
 
 use serde::Deserialize;
@@ -16,9 +18,18 @@ use std::io::{BufReader, Read};
 #[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct BaseInput {
     pub(crate) session_id: String,
-    pub(crate) transcript_path: String,
+    pub(crate) transcript_path: Option<String>,
     pub(crate) cwd: String,
     pub(crate) hook_event_name: String,
+
+    #[serde(default)]
+    pub(crate) turn_id: Option<String>,
+
+    #[serde(default)]
+    pub(crate) model: Option<String>,
+
+    #[serde(default)]
+    pub(crate) permission_mode: Option<String>,
 }
 
 /// Input for the `PreToolUse` hook event.
@@ -31,7 +42,22 @@ pub(crate) struct PreToolUseInput {
     pub(crate) tool_input: HashMap<String, serde_json::Value>,
 
     #[serde(default)]
-    pub(crate) permission_mode: Option<String>,
+    pub(crate) tool_use_id: Option<String>,
+}
+
+/// Input for the `PostToolUse` hook event.
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct PostToolUseInput {
+    #[serde(flatten)]
+    pub(crate) base: BaseInput,
+
+    pub(crate) tool_name: String,
+    pub(crate) tool_input: HashMap<String, serde_json::Value>,
+
+    pub(crate) tool_response: serde_json::Value,
+
+    #[serde(default)]
+    pub(crate) tool_use_id: Option<String>,
 }
 
 /// Input for the `UserPromptSubmit` hook event.
@@ -62,6 +88,20 @@ pub(crate) fn read_pre_tool_use_input_with_raw<R: Read>(
     buf.read_to_end(&mut raw)
         .map_err(|e| InputError::Io(e.to_string()))?;
     let input: PreToolUseInput =
+        serde_json::from_slice(&raw).map_err(|e| InputError::Json(e.to_string()))?;
+    Ok((input, raw))
+}
+
+/// Read JSON from a reader into `PostToolUseInput` and return both the
+/// deserialized struct and the raw bytes.
+pub(crate) fn read_post_tool_use_input_with_raw<R: Read>(
+    reader: R,
+) -> Result<(PostToolUseInput, Vec<u8>), InputError> {
+    let mut buf = BufReader::new(reader);
+    let mut raw = Vec::new();
+    buf.read_to_end(&mut raw)
+        .map_err(|e| InputError::Io(e.to_string()))?;
+    let input: PostToolUseInput =
         serde_json::from_slice(&raw).map_err(|e| InputError::Json(e.to_string()))?;
     Ok((input, raw))
 }

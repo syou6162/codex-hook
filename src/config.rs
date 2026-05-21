@@ -5,7 +5,7 @@
 //! evaluates conditions, executes actions, and returns JSON to stdout.
 //!
 //! References:
-//! - Codex hooks: <https://docs.anthropic.com/en/docs/claude-code/hooks>
+//! - Codex hook schemas: <https://github.com/openai/codex/tree/main/codex-rs/hooks/schema/generated>
 //! - cchook (Go): <https://github.com/syou6162/cchook>
 
 use crate::error::ConfigError;

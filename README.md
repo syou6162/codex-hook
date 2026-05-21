@@ -213,7 +213,7 @@ actions:
 
 #### `output`
 
-Outputs a JSON message (`{"message": "..."}`) to stdout. Optionally sets an exit status (non-zero takes precedence across multiple output actions).
+Outputs a JSON message to stdout. For `PreToolUse` and `UserPromptSubmit`, this is emitted as `{"message": "..."}`. For `PostToolUse`, messages are emitted using Codex's current hook output fields: `systemMessage` for normal output and `decision: "block"` with `reason` when `exit_status` is non-zero.
 
 ```yaml
 actions:
@@ -233,6 +233,7 @@ Examples:
 | `{.tool_name}` | Tool name (e.g. `Write`) |
 | `{.tool_input.file_path}` | File path from tool input |
 | `{.tool_input.command}` | Command string from tool input |
+| `{.tool_response}` | Tool response object (PostToolUse) |
 | `{.cwd}` | Current working directory |
 
 Empty braces `{}` are not treated as templates.
@@ -242,7 +243,7 @@ Empty braces `{}` are not treated as templates.
 | Event | Matcher target | Status |
 |---|---|---|
 | `PreToolUse` | `tool_name` | Implemented |
-| `PostToolUse` | `tool_name` | Config parsing only |
+| `PostToolUse` | `tool_name` | Implemented |
 | `PermissionRequest` | `tool_name` | Config parsing only |
 | `Notification` | optional matcher | Config parsing only |
 | `Stop` | — | Config parsing only |

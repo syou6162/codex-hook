@@ -577,7 +577,7 @@ fn make_ups_ctx<'a>(
     UserPromptSubmitConditionContext {
         cwd,
         prompt,
-        transcript_path,
+        transcript_path: Some(transcript_path),
         session_id,
     }
 }
@@ -688,6 +688,18 @@ fn ups_every_n_prompts_zero_value() {
 #[test]
 fn ups_every_n_prompts_missing_transcript() {
     let ctx = make_ups_ctx("/tmp", "hello", "/nonexistent/transcript.jsonl", "s1");
+    let cond = make_condition(ConditionType::EveryNPrompts, "3");
+    assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
+}
+
+#[test]
+fn ups_every_n_prompts_null_transcript_path() {
+    let ctx = UserPromptSubmitConditionContext {
+        cwd: "/tmp",
+        prompt: "hello",
+        transcript_path: None,
+        session_id: "s1",
+    };
     let cond = make_condition(ConditionType::EveryNPrompts, "3");
     assert!(!evaluate_user_prompt_submit_condition(&cond, &ctx));
 }

@@ -63,6 +63,21 @@ fn output_message_has_only_message_field() {
 }
 
 #[test]
+fn system_message_json_format() {
+    let json = build_system_message_json("post hook completed");
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["systemMessage"], "post hook completed");
+}
+
+#[test]
+fn post_tool_use_block_json_format() {
+    let json = build_post_tool_use_block_json("post hook blocked follow-up");
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["decision"], "block");
+    assert_eq!(parsed["reason"], "post hook blocked follow-up");
+}
+
+#[test]
 fn output_message_merged_multiple_messages() {
     let messages = vec!["msg1".to_string(), "msg2".to_string(), "msg3".to_string()];
     let merged = messages.join("\n");

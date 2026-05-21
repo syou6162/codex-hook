@@ -5,7 +5,7 @@
 //! Use `|` for alternation (e.g. `"Write|Edit"`).
 //! An empty matcher matches every tool name.
 
-use crate::config::PreToolUseHook;
+use crate::config::{PostToolUseHook, PreToolUseHook};
 use regex::Regex;
 
 /// Check whether `tool_name` matches the given matcher pattern.
@@ -26,6 +26,20 @@ pub(crate) fn filter_pre_tool_use_hooks<'a>(
     hooks: &'a [PreToolUseHook],
     tool_name: &str,
 ) -> Result<Vec<&'a PreToolUseHook>, regex::Error> {
+    let mut matched = Vec::new();
+    for hook in hooks {
+        if check_matcher(&hook.matcher, tool_name)? {
+            matched.push(hook);
+        }
+    }
+    Ok(matched)
+}
+
+/// Return references to the PostToolUse hooks whose matcher matches `tool_name`.
+pub(crate) fn filter_post_tool_use_hooks<'a>(
+    hooks: &'a [PostToolUseHook],
+    tool_name: &str,
+) -> Result<Vec<&'a PostToolUseHook>, regex::Error> {
     let mut matched = Vec::new();
     for hook in hooks {
         if check_matcher(&hook.matcher, tool_name)? {
