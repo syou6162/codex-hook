@@ -8,8 +8,7 @@ mod matcher;
 mod template;
 
 use action::{
-    build_output_json, build_post_tool_use_block_json, build_system_message_json, execute_command,
-    merge_exit_status,
+    build_output_json, build_post_tool_use_output_json, execute_command, merge_exit_status,
 };
 use clap::Parser;
 use condition::{
@@ -192,16 +191,12 @@ fn process_post_tool_use(config: &Config) -> Result<Option<i32>, HookError> {
         }
     }
 
-    if !output_messages.is_empty() {
-        let merged = output_messages.join("\n");
-        if merged_exit_status.is_some_and(|code| code != 0) {
-            println!("{}", build_post_tool_use_block_json(&merged));
-            return Ok(None);
-        }
-        println!("{}", build_system_message_json(&merged));
+    if let Some(output_json) = build_post_tool_use_output_json(&output_messages, merged_exit_status)
+    {
+        println!("{}", output_json);
     }
 
-    Ok(merged_exit_status)
+    Ok(None)
 }
 
 /// Process a UserPromptSubmit event: read input, evaluate conditions,

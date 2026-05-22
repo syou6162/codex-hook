@@ -78,6 +78,36 @@ fn post_tool_use_block_json_format() {
 }
 
 #[test]
+fn post_tool_use_output_json_none_without_message_or_status() {
+    assert_eq!(build_post_tool_use_output_json(&[], None), None);
+}
+
+#[test]
+fn post_tool_use_output_json_system_message_for_success() {
+    let messages = vec!["post hook completed".to_string()];
+    let json = build_post_tool_use_output_json(&messages, Some(0)).unwrap();
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["systemMessage"], "post hook completed");
+}
+
+#[test]
+fn post_tool_use_output_json_blocks_without_message() {
+    let json = build_post_tool_use_output_json(&[], Some(2)).unwrap();
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["decision"], "block");
+    assert_eq!(parsed["reason"], DEFAULT_POST_TOOL_USE_BLOCK_REASON);
+}
+
+#[test]
+fn post_tool_use_output_json_blocks_empty_message_with_default_reason() {
+    let messages = vec!["".to_string()];
+    let json = build_post_tool_use_output_json(&messages, Some(2)).unwrap();
+    let parsed: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["decision"], "block");
+    assert_eq!(parsed["reason"], DEFAULT_POST_TOOL_USE_BLOCK_REASON);
+}
+
+#[test]
 fn output_message_merged_multiple_messages() {
     let messages = vec!["msg1".to_string(), "msg2".to_string(), "msg3".to_string()];
     let merged = messages.join("\n");
