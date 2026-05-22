@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::PreToolUseHook;
+use crate::config::{PostToolUseHook, PreToolUseHook};
 
 // -- check_matcher tests --
 
@@ -71,6 +71,14 @@ fn make_hook(matcher: &str) -> PreToolUseHook {
     }
 }
 
+fn make_post_hook(matcher: &str) -> PostToolUseHook {
+    PostToolUseHook {
+        matcher: matcher.to_string(),
+        conditions: vec![],
+        actions: vec![],
+    }
+}
+
 #[test]
 fn filter_returns_matching_hooks() {
     let hooks = vec![make_hook("Write"), make_hook("Bash"), make_hook("Edit")];
@@ -110,4 +118,26 @@ fn filter_propagates_regex_error() {
     let hooks = vec![make_hook("[invalid")];
     let result = filter_pre_tool_use_hooks(&hooks, "Write");
     assert!(result.is_err());
+}
+
+// -- filter_post_tool_use_hooks tests --
+
+#[test]
+fn filter_post_tool_use_returns_matching_hooks() {
+    let hooks = vec![
+        make_post_hook("Write"),
+        make_post_hook("Bash"),
+        make_post_hook("Edit"),
+    ];
+    let matched = filter_post_tool_use_hooks(&hooks, "Bash").unwrap();
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0].matcher, "Bash");
+}
+
+#[test]
+fn filter_post_tool_use_supports_regex_alternation() {
+    let hooks = vec![make_post_hook("Write|Edit"), make_post_hook("Bash")];
+    let matched = filter_post_tool_use_hooks(&hooks, "Edit").unwrap();
+    assert_eq!(matched.len(), 1);
+    assert_eq!(matched[0].matcher, "Write|Edit");
 }

@@ -9,15 +9,76 @@ use std::process::{Command, ExitStatus, Stdio};
 
 /// JSON output structure for the `output` action type.
 ///
-/// Codex reads `{"message": "..."}` from the hook's stdout.
+/// Legacy codex-hook output used by the existing PreToolUse/UserPromptSubmit
+/// processing paths.
 #[derive(Serialize)]
 pub(crate) struct OutputMessage<'a> {
     pub(crate) message: &'a str,
 }
 
+/// Current Codex universal hook output field for user-visible warnings.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SystemMessage<'a> {
+    pub(crate) system_message: &'a str,
+}
+
+/// Current Codex PostToolUse blocking output.
+#[derive(Serialize)]
+pub(crate) struct PostToolUseBlock<'a> {
+    pub(crate) decision: &'a str,
+    pub(crate) reason: &'a str,
+}
+
+const DEFAULT_POST_TOOL_USE_BLOCK_REASON: &str = "PostToolUse hook blocked by output action";
+
 /// Build a JSON string `{"message":"..."}` for the given message.
 pub(crate) fn build_output_json(message: &str) -> String {
     serde_json::to_string(&OutputMessage { message }).expect("JSON serialization should not fail")
+}
+
+/// Build a Codex universal hook output JSON string with `systemMessage`.
+pub(crate) fn build_system_message_json(message: &str) -> String {
+    serde_json::to_string(&SystemMessage {
+        system_message: message,
+    })
+    .expect("JSON serialization should not fail")
+}
+
+/// Build a Codex PostToolUse output JSON string that blocks with `reason`.
+pub(crate) fn build_post_tool_use_block_json(reason: &str) -> String {
+    serde_json::to_string(&PostToolUseBlock {
+        decision: "block",
+        reason,
+    })
+    .expect("JSON serialization should not fail")
+}
+
+/// Build Codex-compatible stdout JSON for PostToolUse output actions.
+///
+/// A non-zero exit status always becomes a PostToolUse block decision. Codex
+/// requires block output to include a non-empty reason, so empty messages fall
+/// back to a stable default reason.
+pub(crate) fn build_post_tool_use_output_json(
+    messages: &[String],
+    exit_status: Option<i32>,
+) -> Option<String> {
+    if exit_status.is_some_and(|code| code != 0) {
+        let merged = messages.join("\n");
+        let reason = if merged.trim().is_empty() {
+            DEFAULT_POST_TOOL_USE_BLOCK_REASON
+        } else {
+            merged.as_str()
+        };
+        return Some(build_post_tool_use_block_json(reason));
+    }
+
+    if messages.is_empty() {
+        return None;
+    }
+
+    let merged = messages.join("\n");
+    Some(build_system_message_json(&merged))
 }
 
 /// Merge a new exit_status into the accumulated result.

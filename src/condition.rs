@@ -25,7 +25,7 @@ pub(crate) struct ConditionContext<'a> {
 pub(crate) struct UserPromptSubmitConditionContext<'a> {
     pub cwd: &'a str,
     pub prompt: &'a str,
-    pub transcript_path: &'a str,
+    pub transcript_path: Option<&'a str>,
     pub session_id: &'a str,
 }
 
@@ -152,11 +152,19 @@ fn check_prompt_regex(prompt: &str, pattern: &str) -> bool {
     }
 }
 
-fn check_every_n_prompts(transcript_path: &str, session_id: &str, value: &str) -> bool {
+fn check_every_n_prompts(transcript_path: Option<&str>, session_id: &str, value: &str) -> bool {
     let n: usize = match value.parse() {
         Ok(v) if v > 0 => v,
         _ => {
             eprintln!("warning: invalid every_n_prompts value '{}'", value);
+            return false;
+        }
+    };
+
+    let transcript_path = match transcript_path {
+        Some(path) => path,
+        None => {
+            eprintln!("warning: every_n_prompts requires transcript_path");
             return false;
         }
     };
