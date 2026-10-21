@@ -296,9 +296,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jaq-core"
-version = "3.0.0"
+version = "3.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dca0f164c8e9c55fc5aefe60b371df735c719b09930dac185878f2f8c7ab6b68"
+checksum = "723ad9253808e95daa2d10ad5b258ac4e65c07003e223e08d1d8734c2942d606"
 dependencies = [
  "dyn-clone",
  "once_cell",
